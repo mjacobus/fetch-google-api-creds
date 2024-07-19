@@ -4,6 +4,7 @@ require 'google/apis/gmail_v1'
 require 'dotenv/load'
 require 'puma'
 require 'googleauth/stores/file_token_store'
+require_relative 'lib/gmail_service'
 
 set :port, 8080
 
@@ -57,6 +58,27 @@ get '/google/oauth2callback' do
   'Authorization complete'
 end
 
+get '/google/fetch_emails' do
+  erb :fetch_emails
+end
+
+post '/google/fetch_emails' do
+  subject = params[:subject]
+  sender = params[:sender]
+
+  gmail_service = GmailService.new
+  emails = gmail_service.search_emails(subject:, sender:)
+
+  erb :display_emails, locals: { emails: }
+end
+
+get '/google/fetch_email/:id' do
+  gmail_service = GmailService.new
+  email = gmail_service.fetch_email(params[:id])
+  content_type :json
+  email.to_json
+end
+
 __END__
 
 @@authorize
@@ -76,5 +98,51 @@ __END__
     <% end %>
     <button type="submit">Authorize</button>
   </form>
+</body>
+</html>
+
+@@fetch_emails
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fetch Emails</title>
+</head>
+<body>
+  <h1>Fetch Emails</h1>
+  <form action="/google/fetch_emails" method="post">
+    <div>
+      <label for="subject">Subject:</label>
+      <input type="text" id="subject" name="subject">
+    </div>
+    <div>
+      <label for="sender">Sender:</label>
+      <input type="text" id="sender" name="sender">
+    </div>
+    <button type="submit">Fetch Emails</button>
+  </form>
+</body>
+</html>
+
+@@display_emails
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fetched Emails</title>
+</head>
+<body>
+  <h1>Fetched Emails</h1>
+  <ul>
+    <% emails.each do |email| %>
+      <li>
+        <p><strong>ID:</strong> <%= email[:id] %></p>
+        <p><strong>Snippet:</strong> <%= email[:snippet] %></p>
+        <p><strong>Subject:</strong> <%= email[:subject] %></p>
+        <p><strong>From:</strong> <%= email[:from] %></p>
+        <p><strong>Date:</strong> <%= email[:date] %></p>
+        <p><a href="/google/fetch_email/<%= email[:id] %>">View Full Email</a></p>
+      </li>
+    <% end %>
+  </ul>
+  <p><a href="/google/fetch_emails">Back</a></p>
 </body>
 </html>
