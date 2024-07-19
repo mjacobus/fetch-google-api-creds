@@ -3,6 +3,7 @@ require 'googleauth'
 require 'google/apis/gmail_v1'
 require 'dotenv/load'
 require 'puma'
+require 'googleauth/stores/file_token_store'
 
 set :port, 8080
 
@@ -14,7 +15,8 @@ RELEVANT_SCOPES = {
   'Full Access' => 'https://www.googleapis.com/auth/gmail'
 }
 
-CREDENTIALS_PATH = 'credentials.json'
+CREDENTIALS_PATH = 'var/secrets/google_client_secrets.json'
+TOKEN_FILE = './var/secrets/token.yaml'
 
 enable :sessions
 set :session_secret, ENV.fetch('SESSION_SECRET') { SecureRandom.hex(64) }
@@ -31,7 +33,7 @@ post '/google/authorize' do
   selected_scopes = params[:scopes]&.map { |scope| RELEVANT_SCOPES[scope] } || []
   session[:selected_scopes] = selected_scopes
   client_id = Google::Auth::ClientId.from_file(CREDENTIALS_PATH)
-  token_store = Google::Auth::Stores::FileTokenStore.new(file: 'tokens.yaml')
+  token_store = Google::Auth::Stores::FileTokenStore.new(file: TOKEN_FILE)
   authorizer = Google::Auth::UserAuthorizer.new(client_id, selected_scopes, token_store)
   user_id = 'default'
   credentials = authorizer.get_credentials(user_id)
@@ -46,7 +48,7 @@ end
 get '/google/oauth2callback' do
   selected_scopes = session[:selected_scopes]
   client_id = Google::Auth::ClientId.from_file(CREDENTIALS_PATH)
-  token_store = Google::Auth::Stores::FileTokenStore.new(file: 'tokens.yaml')
+  token_store = Google::Auth::Stores::FileTokenStore.new(file: TOKEN_FILE)
   authorizer = Google::Auth::UserAuthorizer.new(client_id, selected_scopes, token_store)
   user_id = 'default'
   credentials = authorizer.get_and_store_credentials_from_code(
