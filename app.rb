@@ -1,6 +1,7 @@
 require 'sinatra'
 require 'googleauth'
 require 'google/apis/gmail_v1'
+require 'dotenv/load'
 
 set :port, 8080
 
@@ -8,7 +9,7 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 CREDENTIALS_PATH = 'credentials.json'
 
 get '/' do
-  "Gmail API App"
+  'Gmail API App'
 end
 
 get '/authorize' do
@@ -21,7 +22,7 @@ get '/authorize' do
   if credentials.nil?
     redirect authorizer.get_authorization_url(base_url: request.url)
   else
-    "Credentials already authorized"
+    'Credentials already authorized'
   end
 end
 
@@ -31,7 +32,7 @@ get '/oauth2callback' do
   authorizer = Google::Auth::UserAuthorizer.new(client_id, SCOPES, token_store)
   user_id = 'default'
   credentials = authorizer.get_and_store_credentials_from_code(
-    user_id: user_id, code: params[:code], base_url: request.url
+    user_id:, code: params[:code], base_url: request.url
   )
-  "Authorization complete"
+  'Authorization complete'
 end
