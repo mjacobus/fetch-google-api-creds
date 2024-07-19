@@ -1,9 +1,12 @@
+require 'securerandom'
+
 require 'sinatra'
 require 'googleauth'
 require 'google/apis/gmail_v1'
 require 'dotenv/load'
 require 'puma'
-require 'googleauth/stores/file_token_store'
+require 'json'
+require_relative 'lib/memory_token_store'
 require_relative 'lib/gmail_service'
 
 set :port, 8080
@@ -15,9 +18,6 @@ RELEVANT_SCOPES = {
   'Modify Gmail' => 'https://www.googleapis.com/auth/gmail.modify',
   'Full Access' => 'https://www.googleapis.com/auth/gmail'
 }
-
-CREDENTIALS_PATH = 'var/secrets/google_client_secrets.json'
-TOKEN_FILE = './var/secrets/token.yaml'
 
 enable :sessions
 set :session_secret, ENV.fetch('SESSION_SECRET') { SecureRandom.hex(64) }
@@ -33,8 +33,8 @@ end
 post '/google/authorize' do
   selected_scopes = params[:scopes]&.map { |scope| RELEVANT_SCOPES[scope] } || []
   session[:selected_scopes] = selected_scopes
-  client_id = Google::Auth::ClientId.from_file(CREDENTIALS_PATH)
-  token_store = Google::Auth::Stores::FileTokenStore.new(file: TOKEN_FILE)
+  client_id = Google::Auth::ClientId.new(ENV['GOOGLE_CLIENT_ID'], ENV['GOOGLE_CLIENT_SECRET'])
+  token_store = MemoryTokenStore.new(session)
   authorizer = Google::Auth::UserAuthorizer.new(client_id, selected_scopes, token_store)
   user_id = 'default'
   credentials = authorizer.get_credentials(user_id)
@@ -42,19 +42,21 @@ post '/google/authorize' do
   if credentials.nil?
     redirect authorizer.get_authorization_url(base_url: request.url.gsub('/authorize', '/oauth2callback'))
   else
+    session[:credentials] = credentials.to_json
     'Credentials already authorized'
   end
 end
 
 get '/google/oauth2callback' do
   selected_scopes = session[:selected_scopes]
-  client_id = Google::Auth::ClientId.from_file(CREDENTIALS_PATH)
-  token_store = Google::Auth::Stores::FileTokenStore.new(file: TOKEN_FILE)
+  client_id = Google::Auth::ClientId.new(ENV['GOOGLE_CLIENT_ID'], ENV['GOOGLE_CLIENT_SECRET'])
+  token_store = MemoryTokenStore.new(session)
   authorizer = Google::Auth::UserAuthorizer.new(client_id, selected_scopes, token_store)
   user_id = 'default'
   credentials = authorizer.get_and_store_credentials_from_code(
     user_id:, code: params[:code], base_url: request.url.gsub('/oauth2callback', '/authorize')
   )
+  session[:credentials] = credentials.to_json
   'Authorization complete'
 end
 
@@ -66,14 +68,14 @@ post '/google/fetch_emails' do
   subject = params[:subject]
   sender = params[:sender]
 
-  gmail_service = GmailService.new
+  gmail_service = GmailService.new(session[:credentials])
   emails = gmail_service.search_emails(subject:, sender:)
 
   erb :display_emails, locals: { emails: }
 end
 
 get '/google/fetch_email/:id' do
-  gmail_service = GmailService.new
+  gmail_service = GmailService.new(session[:credentials])
   email = gmail_service.fetch_email(params[:id])
   content_type :json
   email.to_json
