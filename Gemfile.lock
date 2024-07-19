@@ -51,6 +51,9 @@ GEM
       rack (>= 3.0.0, < 4)
     rack-session (2.0.0)
       rack (>= 3.0.0)
+    rackup (2.1.0)
+      rack (>= 3)
+      webrick (~> 1.8)
     representable (3.2.0)
       declarative (< 0.1.0)
       trailblazer-option (>= 0.1.1, < 0.2.0)
@@ -75,6 +78,7 @@ GEM
     trailblazer-option (0.1.2)
     uber (0.1.0)
     uri (0.13.0)
+    webrick (1.8.1)
 
 PLATFORMS
   arm64-darwin-23
@@ -84,7 +88,8 @@ DEPENDENCIES
   dotenv
   google-apis-gmail_v1
   googleauth
-  puma (~> 6.0)
+  puma
+  rackup
   sinatra
 
 BUNDLED WITH
